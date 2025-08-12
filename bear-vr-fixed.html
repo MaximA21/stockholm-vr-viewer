@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>Christmas Bear VR - Meta Quest 3 (Fixed)</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./node_modules/three/build/three.module.js",
+            "@mkkellogg/gaussian-splats-3d": "./node_modules/@mkkellogg/gaussian-splats-3d/build/gaussian-splats-3d.module.js"
+        }
+    }
+    </script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #001122;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+            max-width: 350px;
+        }
+        
+        #vr-button {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 30px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 100;
+            display: none;
+        }
+        
+        #vr-button:hover {
+            background: #ff6666;
+        }
+        
+        #vr-button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h2>🎄 Christmas Bear VR (Fixed)</h2>
+        <p id="status">Initializing...</p>
+        <p>Meta Quest 3 Optimized</p>
+        <div id="debug"></div>
+    </div>
+    
+    <div id="loading">
+        Loading Christmas Bear...<br>
+        🐻🎄
+    </div>
+    
+    <button id="vr-button" disabled>Enter VR Mode</button>
+
+    <script type="module">
+        import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+        import * as THREE from 'three';
+
+        let viewer;
+        let vrSupported = false;
+        let sessionActive = false;
+        
+        function debug(message) {
+            console.log(message);
+            const debugEl = document.getElementById('debug');
+            if (debugEl) {
+                debugEl.innerHTML += `<div style="font-size: 10px; color: #aaa;">${message}</div>`;
+            }
+        }
+        
+        async function init() {
+            try {
+                updateStatus('🔧 Fixing WebXR configuration...');
+                debug('Three.js version: ' + THREE.REVISION);
+                
+                // Check WebXR support first
+                if (!navigator.xr) {
+                    throw new Error('WebXR not supported in this browser');
+                }
+                
+                vrSupported = await navigator.xr.isSessionSupported('immersive-vr');
+                debug('VR supported: ' + vrSupported);
+                
+                if (!vrSupported) {
+                    throw new Error('VR not supported on this device');
+                }
+                
+                updateStatus('✅ WebXR supported! Creating viewer...');
+                
+                // Create viewer with FIXED VR configuration
+                viewer = new GaussianSplats3D.Viewer({
+                    'cameraUp': [0, 1, 0],
+                    'initialCameraPosition': [0, 1.6, 3],
+                    'initialCameraLookAt': [0, 0, 0],
+                    'webXRMode': GaussianSplats3D.WebXRMode.VR,
+                    'webXRSessionInit': {
+                        'requiredFeatures': ['local-floor'],
+                        'optionalFeatures': ['bounded-floor', 'hand-tracking']
+                    },
+                    'renderMode': GaussianSplats3D.RenderMode.Always,
+                    'gpuAcceleratedSort': false,  // CRITICAL: Disable for VR stability
+                    'useBuiltInControls': true,
+                    'rootElement': document.body,
+                    'ignoreDevicePixelRatio': false,
+                    'halfPrecisionCovariancesOnGPU': true,
+                    'devicePixelRatio': window.devicePixelRatio || 1
+                });
+
+                debug('Viewer created successfully');
+                updateStatus('🐻 Loading Christmas bear splats...');
+                
+                // Load the .ksplat file
+                await viewer.addSplatScene('./data/christmas-bear.ksplat', {
+                    'position': [0, 0, 0],
+                    'rotation': [0, 0, 0, 1],
+                    'scale': [1, 1, 1]
+                });
+
+                debug('Bear scene added');
+                updateStatus('🚀 Starting viewer...');
+                
+                // Set up WebXR event handlers BEFORE starting
+                setupWebXRHandlers();
+                
+                // Start the viewer
+                await viewer.start();
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('vr-button').disabled = false;
+                document.getElementById('vr-button').style.display = 'block';
+                
+                updateStatus('✅ Ready! Click "Enter VR Mode"');
+                debug('Viewer started successfully');
+                
+            } catch (error) {
+                console.error('Initialization Error:', error);
+                updateStatus(`❌ Error: ${error.message}`);
+                debug('Error: ' + error.message);
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                // Show fallback info
+                document.getElementById('info').innerHTML += `
+                    <hr style="border-color: #333;">
+                    <h4>🛠️ Troubleshooting:</h4>
+                    <ul style="font-size: 12px;">
+                        <li>Ensure you're using HTTPS</li>
+                        <li>Check if .ksplat file exists</li>
+                        <li>Verify WebXR is enabled in browser</li>
+                        <li>Make sure Quest 3 is connected</li>
+                    </ul>
+                `;
+            }
+        }
+
+        function setupWebXRHandlers() {
+            if (!viewer.renderer || !viewer.renderer.xr) {
+                debug('No WebXR renderer available');
+                return;
+            }
+            
+            debug('Setting up WebXR handlers');
+            
+            viewer.renderer.xr.addEventListener('sessionstart', (event) => {
+                console.log('🥽 VR session started!');
+                sessionActive = true;
+                updateStatus('🥽 VR Active - Enjoy your bear!');
+                debug('Session started');
+                
+                // Set proper reference space
+                try {
+                    const baseReferenceSpace = viewer.renderer.xr.getReferenceSpace();
+                    if (baseReferenceSpace && viewer.camera) {
+                        // Create slight offset for better viewing
+                        const transform = new XRRigidTransform(
+                            {x: 0, y: 0, z: 0.5}, // Move back slightly
+                            {x: 0, y: 0, z: 0, w: 1}
+                        );
+                        const offsetSpace = baseReferenceSpace.getOffsetReferenceSpace(transform);
+                        viewer.renderer.xr.setReferenceSpace(offsetSpace);
+                        debug('Reference space configured');
+                    }
+                } catch (refError) {
+                    debug('Reference space error: ' + refError.message);
+                }
+            });
+
+            viewer.renderer.xr.addEventListener('sessionend', (event) => {
+                console.log('VR session ended');
+                sessionActive = false;
+                updateStatus('VR session ended');
+                debug('Session ended');
+            });
+            
+            viewer.renderer.xr.addEventListener('inputsourceschange', (event) => {
+                debug('Input sources changed: ' + event.added.length + ' added, ' + event.removed.length + ' removed');
+            });
+        }
+
+        async function enterVR() {
+            if (!viewer || !vrSupported || sessionActive) {
+                debug('Cannot enter VR: viewer=' + !!viewer + ', supported=' + vrSupported + ', active=' + sessionActive);
+                return;
+            }
+            
+            try {
+                updateStatus('🔄 Entering VR...');
+                debug('Requesting VR session...');
+                
+                const button = document.getElementById('vr-button');
+                button.disabled = true;
+                button.textContent = 'Entering VR...';
+                
+                // Request VR session with proper features
+                const session = await navigator.xr.requestSession('immersive-vr', {
+                    requiredFeatures: ['local-floor'],
+                    optionalFeatures: ['bounded-floor', 'hand-tracking', 'layers']
+                });
+                
+                debug('VR session requested successfully');
+                
+                // Set the session on the renderer
+                await viewer.renderer.xr.setSession(session);
+                
+                button.textContent = 'Exit VR';
+                button.disabled = false;
+                
+                debug('VR session active');
+                
+            } catch (error) {
+                console.error('VR Error:', error);
+                updateStatus('❌ VR failed: ' + error.message);
+                debug('VR error: ' + error.message);
+                
+                const button = document.getElementById('vr-button');
+                button.disabled = false;
+                button.textContent = 'Enter VR Mode';
+            }
+        }
+
+        function updateStatus(message) {
+            const statusEl = document.getElementById('status');
+            if (statusEl) {
+                statusEl.textContent = message;
+            }
+            console.log('Status:', message);
+        }
+
+        // Set up VR button
+        document.getElementById('vr-button').addEventListener('click', () => {
+            if (sessionActive) {
+                // Exit VR
+                if (viewer.renderer && viewer.renderer.xr && viewer.renderer.xr.getSession()) {
+                    viewer.renderer.xr.getSession().end();
+                }
+            } else {
+                // Enter VR
+                enterVR();
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (viewer && viewer.renderer) {
+                viewer.renderer.setSize(window.innerWidth, window.innerHeight);
+                if (viewer.camera) {
+                    viewer.camera.aspect = window.innerWidth / window.innerHeight;
+                    viewer.camera.updateProjectionMatrix();
+                }
+            }
+        });
+
+        // Handle page visibility to pause/resume
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && sessionActive) {
+                debug('Page hidden, VR might be paused');
+            } else if (!document.hidden && sessionActive) {
+                debug('Page visible, VR should resume');
+            }
+        });
+
+        // Start everything
+        init();
+    </script>
+</body>
+</html>
