@@ -152,7 +152,7 @@
             const loader = new PLYLoader();
 
             loader.load(
-                './data/ai-room.ply',
+                './data/pink-room.ply',
                 (geometry) => {
                     try {
                         console.log('Point cloud PLY loaded:', geometry);
@@ -200,7 +200,7 @@
 
 // This moves the entire scene so the "spawn point" changes
 // Example: Start 2m back and 1.6m above ground
-                        worldGroup.position.set(-5, 1.8, -5);
+                        worldGroup.position.set(-5, 1.5, -5);
                         worldGroup.rotation.x = Math.PI; // Math.PI = 180 degrees
 
                         scene.add(worldGroup);
