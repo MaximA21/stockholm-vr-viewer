@@ -200,7 +200,7 @@
 
 // This moves the entire scene so the "spawn point" changes
 // Example: Start 2m back and 1.6m above ground
-                        worldGroup.position.set(-5, 1.5, -5);
+                        worldGroup.position.set(-1, 1.5, -8);
                         worldGroup.rotation.x = Math.PI; // Math.PI = 180 degrees
 
                         scene.add(worldGroup);
@@ -250,7 +250,7 @@
         // Add gentle rotation to the point cloud
         if (pointCloud) {
             const time = Date.now() * 0.001;
-            pointCloud.rotation.y = Math.sin(time * 0.2) * 0.1;
+            pointCloud.rotation.y = Math.sin(time * 0.2) * 0.01;
         }
 
         renderer.render(scene, camera);
